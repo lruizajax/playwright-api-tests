@@ -1,0 +1,64 @@
+name: Playwright API Tests with Allure + GitHub Pages
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+permissions:
+  contents: write  # ✅ Necesario para publicar en GitHub Pages
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      # 1️⃣ Clonar repositorio
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2️⃣ Configurar Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      # 3️⃣ Instalar dependencias
+      - name: Install dependencies
+        run: npm ci
+
+      # 4️⃣ Instalar navegadores de Playwright (aunque uses API)
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
+
+      # 5️⃣ Crear archivo .env con el token de GitHub
+      - name: Create .env file
+        run: echo "GITHUB_TOKEN=${{ secrets.PERSONAL_GITHUB_TOKEN }}" > .env
+
+      # 6️⃣ Ejecutar pruebas con reporter Allure
+      - name: Run Playwright tests with Allure
+        run: npx playwright test --reporter=line,allure-playwright
+
+      # 7️⃣ Generar el reporte Allure
+      - name: Generate Allure Report
+        run: npx allure generate allure-results --clean -o allure-report
+
+      # 8️⃣ Subir artefactos (Playwright + Allure)
+      - name: Upload Allure Report artifact
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-report
+          path: allure-report/
+          retention-days: 15
+
+      # 9️⃣ Publicar el reporte Allure en GitHub Pages
+      - name: Deploy Allure Report to GitHub Pages
+        if: ${{ !cancelled() }}
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.PERSONAL_GITHUB_TOKEN }}
+          publish_dir: ./allure-report
+          publish_branch: gh-pages
